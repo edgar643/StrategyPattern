@@ -18,7 +18,20 @@ public class PaymentResponseProcessor {
         paymentResponseHandlerList.addAll(List.of(new SuccessPaymentHandler(), new FailedPaymentHandler(), new DefaultPaymentHandler()));
     }
 
+    /**
+     * Processes a payment response by finding the first handler that can handle the response
+     * and delegating the processing to it.
+     * <p>
+     * The method uses a stream to iterate over the list of payment response handlers,
+     * filters handlers that can handle the given response, and processes the response
+     * using the first matching handler.
+     *
+     * @param response The payment response to be processed.
+     */
     public void processPaymentResponse(PaymentResponse response) {
-        paymentResponseHandlerList.stream().filter(paymentResponseHandler -> paymentResponseHandler.canHandle(response)).findFirst().ifPresent(paymentResponseHandler -> paymentResponseHandler.process(response));
+        paymentResponseHandlerList.stream()
+                .filter(paymentResponseHandler -> paymentResponseHandler.canHandle(response))
+                .findFirst()
+                .ifPresent(paymentResponseHandler -> paymentResponseHandler.process(response));
     }
 }
