@@ -8,24 +8,32 @@ package com.globant.paymentservice.service;
     import com.globant.paymentservice.model.PaymentResponse;
     import com.globant.paymentservice.model.Transaction;
     import com.globant.paymentservice.repository.TransactionRepository;
+    import com.globant.paymentservice.service.handler.DefaultPaymentHandler;
+    import com.globant.paymentservice.service.handler.PaymentResponseHandler;
     import com.globant.paymentservice.strategy.PaymentContext;
+    import com.globant.paymentservice.service.handler.*;
     import com.globant.paymentservice.strategy.PaymentStrategy;
     import jakarta.transaction.Transactional;
     import lombok.extern.slf4j.Slf4j;
     import org.springframework.stereotype.Service;
 
-    /**
+    import java.util.List;
+
+/**
      * Service class responsible for handling payment processing logic.
      */
     @Slf4j
     @Service
     public class PaymentService {
-        final private PaymentContext paymentContext;
-        final private PaymentDetailsInitializer paymentDetailsInitializer;
-        final private TransactionRepository transactionRepository;
-        private PaymentStrategy strategy;
+    final private PaymentContext paymentContext;
+    final private PaymentDetailsInitializer paymentDetailsInitializer;
+    final private TransactionRepository transactionRepository;
+    final private SuccessPaymentHandler successHandler;
+    final private FailedPaymentHandler failedHandler;
+    final private DefaultPaymentHandler defaultHandler;
+    private PaymentStrategy strategy;
 
-        /**
+    /**
          * Constructor to initialize the PaymentService with required dependencies.
          *
          * @param paymentContext              The payment context containing strategies.
@@ -34,10 +42,18 @@ package com.globant.paymentservice.service;
          */
         public PaymentService(PaymentContext paymentContext,
                               PaymentDetailsInitializer paymentDetailsInitializer,
-                              TransactionRepository transactionRepository) {
+                              TransactionRepository transactionRepository,
+                              SuccessPaymentHandler successHandler,
+                              FailedPaymentHandler failedHandler,
+                              DefaultPaymentHandler defaultHandler) {
             this.paymentContext = paymentContext;
             this.paymentDetailsInitializer = paymentDetailsInitializer;
             this.transactionRepository = transactionRepository;
+            this.successHandler = successHandler;
+            this.failedHandler = failedHandler;
+            this.defaultHandler = defaultHandler;
+            this.successHandler.setNextHandler(failedHandler);
+            this.failedHandler.setNextHandler(defaultHandler);
         }
 
         /**
@@ -50,10 +66,14 @@ package com.globant.paymentservice.service;
         @Transactional
         public PaymentResponse processPayment(final PaymentRequest paymentRequest) {
             setStrategy(paymentRequest.getPaymentMethod());
-            final var paymentDetails = getPayMentDetails(paymentRequest);
+            final var paymentDetails = getPaymentDetails(paymentRequest);
             paymentRequest.setPaymentDetails(paymentDetails);
             final var paymentResponse = strategy.processPayment(paymentRequest);
+            log.info("Payment response: {}", paymentResponse);
             final var transactionSaved = saveTransaction(paymentRequest, paymentResponse);
+            // To handle a response:
+            successHandler.handle(paymentResponse);
+
             if (!transactionSaved) {
                 log.error("Transaction saved failed");
                 throw new BusinessException(ErrorCode.ERR_TRANSACTION.getMessage(), ErrorCode.ERR_TRANSACTION.getCode());
@@ -86,7 +106,7 @@ package com.globant.paymentservice.service;
          * @param paymentRequest The payment request containing the payment method.
          * @return The payment details associated with the payment method.
          */
-        private PaymentDetails getPayMentDetails(PaymentRequest paymentRequest) {
+        private PaymentDetails getPaymentDetails(PaymentRequest paymentRequest) {
             Payment_Method paymentMethod = paymentRequest.getPaymentMethod();
             return paymentDetailsInitializer.getPaymentDetailsMap().get(paymentMethod);
         }
