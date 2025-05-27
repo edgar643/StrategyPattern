@@ -9,15 +9,6 @@ import org.springframework.stereotype.Component;
 @Setter
 public abstract class PaymentResponseHandler {
     protected PaymentResponseHandler nextHandler;
-
-    public void handle(PaymentResponse response) {
-        if (canHandle(response)) {
-            process(response);
-        } else if (nextHandler != null) {
-            nextHandler.handle(response);
-        }
-    }
-
-    protected abstract boolean canHandle(PaymentResponse response);
-    protected abstract void process(PaymentResponse response);
+    public abstract boolean canHandle(PaymentResponse response);
+    public abstract void process(PaymentResponse response);
 }

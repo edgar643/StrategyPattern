@@ -8,16 +8,11 @@ package com.globant.paymentservice.service;
     import com.globant.paymentservice.model.PaymentResponse;
     import com.globant.paymentservice.model.Transaction;
     import com.globant.paymentservice.repository.TransactionRepository;
-    import com.globant.paymentservice.service.handler.DefaultPaymentHandler;
-    import com.globant.paymentservice.service.handler.PaymentResponseHandler;
     import com.globant.paymentservice.strategy.PaymentContext;
-    import com.globant.paymentservice.service.handler.*;
     import com.globant.paymentservice.strategy.PaymentStrategy;
     import jakarta.transaction.Transactional;
     import lombok.extern.slf4j.Slf4j;
     import org.springframework.stereotype.Service;
-
-    import java.util.List;
 
 /**
      * Service class responsible for handling payment processing logic.
@@ -28,9 +23,7 @@ package com.globant.paymentservice.service;
     final private PaymentContext paymentContext;
     final private PaymentDetailsInitializer paymentDetailsInitializer;
     final private TransactionRepository transactionRepository;
-    final private SuccessPaymentHandler successHandler;
-    final private FailedPaymentHandler failedHandler;
-    final private DefaultPaymentHandler defaultHandler;
+    final private PaymentResponseProcessor paymentResponseProcessor;
     private PaymentStrategy strategy;
 
     /**
@@ -43,17 +36,11 @@ package com.globant.paymentservice.service;
         public PaymentService(PaymentContext paymentContext,
                               PaymentDetailsInitializer paymentDetailsInitializer,
                               TransactionRepository transactionRepository,
-                              SuccessPaymentHandler successHandler,
-                              FailedPaymentHandler failedHandler,
-                              DefaultPaymentHandler defaultHandler) {
+                              PaymentResponseProcessor paymentResponseProcessor) {
             this.paymentContext = paymentContext;
             this.paymentDetailsInitializer = paymentDetailsInitializer;
             this.transactionRepository = transactionRepository;
-            this.successHandler = successHandler;
-            this.failedHandler = failedHandler;
-            this.defaultHandler = defaultHandler;
-            this.successHandler.setNextHandler(failedHandler);
-            this.failedHandler.setNextHandler(defaultHandler);
+            this.paymentResponseProcessor = paymentResponseProcessor;
         }
 
         /**
@@ -71,8 +58,7 @@ package com.globant.paymentservice.service;
             final var paymentResponse = strategy.processPayment(paymentRequest);
             log.info("Payment response: {}", paymentResponse);
             final var transactionSaved = saveTransaction(paymentRequest, paymentResponse);
-            // To handle a response:
-            successHandler.handle(paymentResponse);
+            paymentResponseProcessor.processPaymentResponse(paymentResponse);
 
             if (!transactionSaved) {
                 log.error("Transaction saved failed");
