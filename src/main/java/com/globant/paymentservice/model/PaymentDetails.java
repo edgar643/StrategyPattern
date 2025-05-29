@@ -31,5 +31,4 @@ public class PaymentDetails {
      * The bank account number used for the payment.
      */
     private String bankAccountNumber;
-
 }

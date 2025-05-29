@@ -8,8 +8,9 @@ package com.globant.paymentservice.service;
     import com.globant.paymentservice.model.PaymentResponse;
     import com.globant.paymentservice.model.Transaction;
     import com.globant.paymentservice.repository.TransactionRepository;
-    import com.globant.paymentservice.strategy.PaymentContext;
-    import com.globant.paymentservice.strategy.PaymentStrategy;
+    import com.globant.paymentservice.service.chainresponsability.PaymentResponseProcessor;
+    import com.globant.paymentservice.service.strategy.PaymentContext;
+    import com.globant.paymentservice.service.strategy.PaymentStrategy;
     import jakarta.transaction.Transactional;
     import lombok.extern.slf4j.Slf4j;
     import org.springframework.stereotype.Service;
@@ -20,11 +21,11 @@ package com.globant.paymentservice.service;
     @Slf4j
     @Service
     public class PaymentService {
+    static private PaymentStrategy strategy;
     final private PaymentContext paymentContext;
     final private PaymentDetailsInitializer paymentDetailsInitializer;
     final private TransactionRepository transactionRepository;
     final private PaymentResponseProcessor paymentResponseProcessor;
-    private PaymentStrategy strategy;
 
     /**
          * Constructor to initialize the PaymentService with required dependencies.
@@ -43,29 +44,38 @@ package com.globant.paymentservice.service;
             this.paymentResponseProcessor = paymentResponseProcessor;
         }
 
-        /**
-         * Processes a payment request and returns the payment response.
-         *
-         * @param paymentRequest The payment request containing input data.
-         * @return The payment response containing the result of the transaction.
-         * @throws BusinessException If the transaction fails or the payment method is invalid.
-         */
-        @Transactional
-        public PaymentResponse processPayment(final PaymentRequest paymentRequest) {
-            setStrategy(paymentRequest.getPaymentMethod());
-            final var paymentDetails = getPaymentDetails(paymentRequest);
-            paymentRequest.setPaymentDetails(paymentDetails);
-            final var paymentResponse = strategy.processPayment(paymentRequest);
-            log.info("Payment response: {}", paymentResponse);
-            final var transactionSaved = saveTransaction(paymentRequest, paymentResponse);
-            paymentResponseProcessor.processPaymentResponse(paymentResponse);
+    /**
+     * Processes a payment request and returns the payment response.
+     * <p>
+     * This method performs the following steps:
+     * 1. Sets the payment strategy based on the payment method in the request.
+     * 2. Retrieves payment details for the given payment method and assigns them to the request.
+     * 3. Processes the payment using the selected strategy and logs the response.
+     * 4. Saves the transaction to the database and verifies if it was saved successfully.
+     * 5. Delegates further processing of the payment response to the response processor.
+     * 6. Throws a BusinessException if the transaction saving fails.
+     *
+     * @param paymentRequest The payment request containing input data such as payment method and details.
+     * @return The payment response containing the result of the transaction.
+     * @throws BusinessException If the transaction saving fails or the payment method is invalid.
+     */
+    @Transactional
+    public PaymentResponse processPayment(final PaymentRequest paymentRequest) {
+        setStrategy(paymentRequest.getPaymentMethod());
+        final var paymentDetails = getPaymentDetails(paymentRequest);
+        paymentRequest.setPaymentDetails(paymentDetails);
+        final var paymentResponse = strategy.processPayment(paymentRequest);
+        log.info("Payment response: {}", paymentResponse);
+        final var transactionSaved = saveTransaction(paymentRequest, paymentResponse);
 
-            if (!transactionSaved) {
-                log.error("Transaction saved failed");
-                throw new BusinessException(ErrorCode.ERR_TRANSACTION.getMessage(), ErrorCode.ERR_TRANSACTION.getCode());
-            }
-            return paymentResponse;
+        paymentResponseProcessor.processPaymentResponse(paymentResponse);
+
+        if (!transactionSaved) {
+            log.error("Transaction saved failed");
+            throw new BusinessException(ErrorCode.ERR_TRANSACTION.getMessage(), ErrorCode.ERR_TRANSACTION.getCode());
         }
+        return paymentResponse;
+    }
 
         /**
          * Saves a transaction to the database.

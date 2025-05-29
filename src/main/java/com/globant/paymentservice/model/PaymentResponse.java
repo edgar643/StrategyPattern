@@ -1,5 +1,6 @@
 package com.globant.paymentservice.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
@@ -8,6 +9,7 @@ import lombok.Data;
  */
 @Builder
 @Data
+@AllArgsConstructor
 public class PaymentResponse {
     /**
      * The unique identifier for the transaction.

@@ -31,7 +31,7 @@ public class PaymentDetailsInitializer {
     /**
      * A map to store payment details categorized by payment methods.
      */
-    private HashMap<Payment_Method, PaymentDetails> paymentDetailsMap = new HashMap<>();
+    private final HashMap<Payment_Method, PaymentDetails> paymentDetailsMap = new HashMap<>();
 
     /**
      * Constructor to inject the PaymentDetailsRepository dependency.
